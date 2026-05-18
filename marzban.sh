@@ -752,8 +752,8 @@ services:
       - --host-cache-size=0                       # Disables host cache to prevent DNS issues
       - --innodb-open-files=1024                  # Sets the limit for InnoDB open files
       - --innodb-buffer-pool-size=256M            # Allocates buffer pool size for InnoDB
-      - --binlog_expire_logs_seconds=1209600      # Sets binary log expiration to 14 days (2 weeks)
-      - --innodb-redo-log-capacity=67108864        # Sets InnoDB redo log capacity to 64M (replaces innodb-log-file-size)
+      - --innodb-log-file-size=64M               # Sets InnoDB log file size
+      - --expire_logs_days=14                     # Sets binary log expiration to 14 days
       - --innodb-doublewrite=0                    # Disables doublewrite buffer (reduces disk I/O; may increase data loss risk)
       - --general_log=0                           # Disables general query log to reduce disk usage
       - --slow_query_log=1                        # Enables slow query log for identifying performance issues
@@ -763,11 +763,11 @@ services:
       - /var/lib/marzban/mysql:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      start_period: 10s
+      start_period: 30s
       start_interval: 3s
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 10
 EOF
         echo "----------------------------"
         colorized_echo red "Using MariaDB as database"
