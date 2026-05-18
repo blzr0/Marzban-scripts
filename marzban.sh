@@ -753,7 +753,7 @@ services:
       - --innodb-open-files=1024                  # Sets the limit for InnoDB open files
       - --innodb-buffer-pool-size=256M            # Allocates buffer pool size for InnoDB
       - --binlog_expire_logs_seconds=1209600      # Sets binary log expiration to 14 days (2 weeks)
-      - --innodb-log-file-size=64M                # Sets InnoDB log file size to balance log retention and performance
+      - --innodb-redo-log-capacity=67108864        # Sets InnoDB redo log capacity to 64M (replaces innodb-log-file-size)
       - --innodb-log-files-in-group=2             # Uses two log files to balance recovery and disk I/O
       - --innodb-doublewrite=0                    # Disables doublewrite buffer (reduces disk I/O; may increase data loss risk)
       - --general_log=0                           # Disables general query log to reduce disk usage
@@ -846,7 +846,7 @@ services:
       - --host-cache-size=0                       # Disables host cache to prevent DNS issues
       - --innodb-open-files=1024                  # Sets the limit for InnoDB open files
       - --innodb-buffer-pool-size=256M            # Allocates buffer pool size for InnoDB
-      - --innodb-log-file-size=64M                # Sets InnoDB log file size to balance log retention and performance
+      - --innodb-redo-log-capacity=67108864        # Sets InnoDB redo log capacity to 64M (replaces innodb-log-file-size)
       - --innodb-log-files-in-group=2             # Uses two log files to balance recovery and disk I/O
       - --general_log=0                           # Disables general query log for lower disk usage
       - --slow_query_log=1                        # Enables slow query log for performance analysis
