@@ -752,7 +752,7 @@ services:
       - --host-cache-size=0                       # Disables host cache to prevent DNS issues
       - --innodb-open-files=1024                  # Sets the limit for InnoDB open files
       - --innodb-buffer-pool-size=256M            # Allocates buffer pool size for InnoDB
-      - --innodb-redo-log-capacity=128M           # Sets InnoDB redo log capacity (replaces innodb-log-file-size in MySQL 9.x)
+      - --innodb-log-file-size=64M               # Sets InnoDB log file size
       - --expire_logs_days=14                     # Sets binary log expiration to 14 days
       - --innodb-doublewrite=0                    # Disables doublewrite buffer (reduces disk I/O; may increase data loss risk)
       - --general_log=0                           # Disables general query log to reduce disk usage
