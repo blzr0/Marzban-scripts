@@ -571,7 +571,7 @@ backup_command() {
 
     cp "$APP_DIR/.env" "$temp_dir/" 2>>"$log_file"
     cp "$APP_DIR/docker-compose.yml" "$temp_dir/" 2>>"$log_file"
-    rsync -av --exclude 'xray-core' --exclude 'mysql' --exclude 'mysql_backup' "$DATA_DIR/" "$temp_dir/marzban_data/" >>"$log_file" 2>&1
+    rsync -av --exclude 'xray-core' --exclude 'mysql' "$DATA_DIR/" "$temp_dir/marzban_data/" >>"$log_file" 2>&1
 
     if ! tar -czf "$backup_file" -C "$temp_dir" .; then
         error_messages+=("Failed to create backup archive.")
