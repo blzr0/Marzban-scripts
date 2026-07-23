@@ -8,6 +8,9 @@ if [[ "$1" ]]; then
     RELEASE_TAG="$1"
 fi
 
+USE_RU_GEO="${USE_RU_GEO:-true}"
+RUNETFREEDOM_BASE_URL="https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release"
+
 check_if_running_as_root() {
     # If you want to run as another user, please modify $EUID to be owned by this user
     if [[ "$EUID" -ne '0' ]]; then
@@ -99,11 +102,91 @@ extract_xray() {
     echo "Extracted Xray archive to $TMP_DIRECTORY"
 }
 
+is_ru_geo_enabled() {
+    case "$USE_RU_GEO" in
+        false|0|no|off|FALSE|False|No|NO|Off|OFF)
+            return 1
+        ;;
+        *)
+            return 0
+        ;;
+    esac
+}
+
+fetch() {
+    curl -fRL --retry 3 --retry-delay 2 --connect-timeout 10 -H 'Cache-Control: no-cache' -o "$2" "$1"
+}
+
+verify_checksum() {
+    local file="$1"
+    local sha_file="$2"
+    local expected_hash actual_hash
+
+    expected_hash="$(awk '{print tolower($1); exit}' "$sha_file" 2>/dev/null)"
+    if [[ -z "$expected_hash" ]]; then
+        return 1
+    fi
+
+    actual_hash="$(sha256sum "$file" | awk '{print tolower($1)}')"
+
+    [[ "$expected_hash" == "$actual_hash" ]]
+}
+
+download_russian_geo() {
+    local geoip_url="${RUNETFREEDOM_BASE_URL}/geoip.dat"
+    local geosite_url="${RUNETFREEDOM_BASE_URL}/geosite.dat"
+
+    if ! fetch "$geoip_url" "${TMP_DIRECTORY}/ru-geoip.dat"; then
+        echo "warning: failed to download runetfreedom geoip.dat"
+        return 1
+    fi
+    if ! fetch "${geoip_url}.sha256sum" "${TMP_DIRECTORY}/ru-geoip.dat.sha256sum"; then
+        echo "warning: failed to download runetfreedom geoip.dat checksum"
+        return 1
+    fi
+    if ! fetch "$geosite_url" "${TMP_DIRECTORY}/ru-geosite.dat"; then
+        echo "warning: failed to download runetfreedom geosite.dat"
+        return 1
+    fi
+    if ! fetch "${geosite_url}.sha256sum" "${TMP_DIRECTORY}/ru-geosite.dat.sha256sum"; then
+        echo "warning: failed to download runetfreedom geosite.dat checksum"
+        return 1
+    fi
+
+    if ! verify_checksum "${TMP_DIRECTORY}/ru-geoip.dat" "${TMP_DIRECTORY}/ru-geoip.dat.sha256sum"; then
+        echo "warning: checksum mismatch for runetfreedom geoip.dat"
+        return 1
+    fi
+    if ! verify_checksum "${TMP_DIRECTORY}/ru-geosite.dat" "${TMP_DIRECTORY}/ru-geosite.dat.sha256sum"; then
+        echo "warning: checksum mismatch for runetfreedom geosite.dat"
+        return 1
+    fi
+
+    return 0
+}
+
 place_xray() {
     install -m 755 "${TMP_DIRECTORY}/xray" "/usr/local/bin/xray"
     install -d "/usr/local/share/xray/"
-    install -m 644 "${TMP_DIRECTORY}/geoip.dat" "/usr/local/share/xray/geoip.dat"
-    install -m 644 "${TMP_DIRECTORY}/geosite.dat" "/usr/local/share/xray/geosite.dat"
+
+    local geo_source="xtls"
+    if is_ru_geo_enabled; then
+        if download_russian_geo; then
+            geo_source="runetfreedom"
+        else
+            echo "warning: failed to fetch runetfreedom geo files, falling back to XTLS defaults"
+        fi
+    fi
+
+    if [[ "$geo_source" == "runetfreedom" ]]; then
+        install -m 644 "${TMP_DIRECTORY}/ru-geoip.dat" "/usr/local/share/xray/geoip.dat"
+        install -m 644 "${TMP_DIRECTORY}/ru-geosite.dat" "/usr/local/share/xray/geosite.dat"
+        echo "Geo files installed from runetfreedom (russia-v2ray-rules-dat)"
+    else
+        install -m 644 "${TMP_DIRECTORY}/geoip.dat" "/usr/local/share/xray/geoip.dat"
+        install -m 644 "${TMP_DIRECTORY}/geosite.dat" "/usr/local/share/xray/geosite.dat"
+    fi
+
     echo "Xray files installed"
 }
 
