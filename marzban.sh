@@ -590,6 +590,86 @@ backup_command() {
 
 
 
+is_ru_geo_enabled() {
+    case "$USE_RU_GEO" in
+        false|0|no|off|FALSE|False|No|NO|Off|OFF)
+            return 1
+        ;;
+        *)
+            return 0
+        ;;
+    esac
+}
+
+fetch_ru_geo_file() {
+    curl -fRL --retry 3 --retry-delay 2 --connect-timeout 10 -H 'Cache-Control: no-cache' -o "$2" "$1"
+}
+
+verify_ru_geo_checksum() {
+    local file="$1"
+    local sha_file="$2"
+    local expected_hash actual_hash
+
+    expected_hash="$(awk '{print tolower($1); exit}' "$sha_file" 2>/dev/null)"
+    if [ -z "$expected_hash" ]; then
+        return 1
+    fi
+
+    actual_hash="$(sha256sum "$file" | awk '{print tolower($1)}')"
+
+    [ "$expected_hash" = "$actual_hash" ]
+}
+
+# Replaces geoip.dat/geosite.dat in $1 with the runetfreedom (russia-v2ray-rules-dat)
+# build, verified by sha256sum. Leaves the XTLS-bundled files already unzipped there
+# untouched on any failure (disabled, network error, checksum mismatch).
+update_ru_geo_files() {
+    local target_dir="$1"
+    USE_RU_GEO="${USE_RU_GEO:-true}"
+
+    if ! is_ru_geo_enabled; then
+        return 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+        install_package curl
+    fi
+
+    local base_url="https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release"
+    local tmp_dir
+    tmp_dir="$(mktemp -d)"
+
+    if ! fetch_ru_geo_file "${base_url}/geoip.dat" "${tmp_dir}/geoip.dat"; then
+        colorized_echo yellow "warning: failed to download runetfreedom geoip.dat, keeping XTLS defaults"
+        rm -rf "$tmp_dir"; return 1
+    fi
+    if ! fetch_ru_geo_file "${base_url}/geoip.dat.sha256sum" "${tmp_dir}/geoip.dat.sha256sum"; then
+        colorized_echo yellow "warning: failed to download runetfreedom geoip.dat checksum, keeping XTLS defaults"
+        rm -rf "$tmp_dir"; return 1
+    fi
+    if ! fetch_ru_geo_file "${base_url}/geosite.dat" "${tmp_dir}/geosite.dat"; then
+        colorized_echo yellow "warning: failed to download runetfreedom geosite.dat, keeping XTLS defaults"
+        rm -rf "$tmp_dir"; return 1
+    fi
+    if ! fetch_ru_geo_file "${base_url}/geosite.dat.sha256sum" "${tmp_dir}/geosite.dat.sha256sum"; then
+        colorized_echo yellow "warning: failed to download runetfreedom geosite.dat checksum, keeping XTLS defaults"
+        rm -rf "$tmp_dir"; return 1
+    fi
+    if ! verify_ru_geo_checksum "${tmp_dir}/geoip.dat" "${tmp_dir}/geoip.dat.sha256sum"; then
+        colorized_echo yellow "warning: checksum mismatch for runetfreedom geoip.dat, keeping XTLS defaults"
+        rm -rf "$tmp_dir"; return 1
+    fi
+    if ! verify_ru_geo_checksum "${tmp_dir}/geosite.dat" "${tmp_dir}/geosite.dat.sha256sum"; then
+        colorized_echo yellow "warning: checksum mismatch for runetfreedom geosite.dat, keeping XTLS defaults"
+        rm -rf "$tmp_dir"; return 1
+    fi
+
+    mv "${tmp_dir}/geoip.dat" "${target_dir}/geoip.dat"
+    mv "${tmp_dir}/geosite.dat" "${target_dir}/geosite.dat"
+    rm -rf "$tmp_dir"
+    colorized_echo green "Geo files installed from runetfreedom (russia-v2ray-rules-dat)"
+}
+
 get_xray_core() {
     identify_the_operating_system_and_architecture
     clear
@@ -677,6 +757,8 @@ get_xray_core() {
     echo -e "\033[1;33mExtracting Xray-core...\033[0m"
     unzip -o "${xray_filename}" >/dev/null 2>&1
     rm "${xray_filename}"
+
+    update_ru_geo_files "$DATA_DIR/xray-core"
 }
 
 # Function to update the Marzban Main core
