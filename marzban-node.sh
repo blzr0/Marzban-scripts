@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
+EXTRA_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     key="$1"
-    
+
     case $key in
-        install|update|uninstall|up|down|restart|status|logs|core-update|install-script|uninstall-script|edit)
+        install|update|uninstall|up|down|restart|status|logs|inbounds|core-update|install-script|uninstall-script|edit)
             COMMAND="$1"
             shift # past argument
         ;;
@@ -21,6 +22,10 @@ while [[ $# -gt 0 ]]; do
             shift # past value
         ;;
         *)
+            # Not a recognized command or --name: keep it around so
+            # subcommands (e.g. inbounds) that take their own options can
+            # still see it below - this loop otherwise consumes all of $@.
+            EXTRA_ARGS+=("$1")
             shift # past unknown argument
         ;;
     esac
@@ -653,6 +658,59 @@ logs_command() {
     fi
 }
 
+inbounds_command() {
+    help() {
+        colorized_echo red "Usage: marzban-node inbounds [options]"
+        echo ""
+        echo "OPTIONS:"
+        echo "  -h, --help    display this help message"
+        echo "  -j, --json    print raw JSON instead of a table"
+    }
+
+    local as_json=false
+    while [[ "$#" -gt 0 ]]; do
+        case "$1" in
+            -j|--json)
+                as_json=true
+            ;;
+            -h|--help)
+                help
+                exit 0
+            ;;
+            *)
+                echo "Error: Invalid option: $1" >&2
+                help
+                exit 0
+            ;;
+        esac
+        shift
+    done
+
+    # Check if marzban-node is installed
+    if ! is_marzban_node_installed; then
+        colorized_echo red "Marzban-node's not installed!"
+        exit 1
+    fi
+
+    detect_compose
+
+    if ! is_marzban_node_up; then
+        colorized_echo red "Marzban-node is not up."
+        exit 1
+    fi
+
+    if ! docker ps --format '{{.Names}}' | grep -q "^$APP_NAME$"; then
+        colorized_echo red "Container $APP_NAME not found."
+        exit 1
+    fi
+
+    if [ "$as_json" = true ]; then
+        docker exec "$APP_NAME" python3 cli.py status --json
+    else
+        docker exec "$APP_NAME" python3 cli.py status
+    fi
+}
+
 update_command() {
     check_running_as_root
     # Check if marzban is installed
@@ -1088,6 +1146,7 @@ usage() {
     colorized_echo yellow "  restart         $(tput sgr0)– Restart services"
     colorized_echo yellow "  status          $(tput sgr0)– Show status"
     colorized_echo yellow "  logs            $(tput sgr0)– Show logs"
+    colorized_echo yellow "  inbounds        $(tput sgr0)– Show live Xray inbounds/status (diagnostic)"
     colorized_echo yellow "  install         $(tput sgr0)– Install/reinstall Marzban-node"
     colorized_echo yellow "  update          $(tput sgr0)– Update to latest version"
     colorized_echo yellow "  uninstall       $(tput sgr0)– Uninstall Marzban-node"
@@ -1147,6 +1206,9 @@ case "$COMMAND" in
     ;;
     logs)
         logs_command
+    ;;
+    inbounds)
+        inbounds_command "${EXTRA_ARGS[@]}"
     ;;
     core-update)
         update_core_command
