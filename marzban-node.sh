@@ -1205,7 +1205,7 @@ case "$COMMAND" in
         status_command
     ;;
     logs)
-        logs_command
+        logs_command "${EXTRA_ARGS[@]}"
     ;;
     inbounds)
         inbounds_command "${EXTRA_ARGS[@]}"
